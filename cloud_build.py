@@ -26,6 +26,8 @@ def drive():
     cr = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/drive.readonly"])
     return AuthorizedSession(cr)
 
+MODS = []   # آخر تعديل فعلي لكل ملف على الدرايف
+
 def download(s, dest):
     """بينزّل كل xlsx (وأي Google Sheet كـ xlsx) من الفولدر ومن الفولدرات اللي جواه."""
     files, stack = [], [FOLDER]
@@ -66,6 +68,7 @@ def download(s, dest):
         if os.path.exists(p): p = os.path.join(dest, f["id"][:6] + "_" + name)
         open(p, "wb").write(r.content)
         t = dt.datetime.fromisoformat(f["modifiedTime"].replace("Z", "+00:00")).timestamp()
+        MODS.append(t)
         os.utime(p, (t, t))        # الأحدث الأول (بيفرق لو فيه نسختين من الشرائح)
         got.append(p); print("  downloaded:", name, len(r.content) // 1024, "KB")
     return got
@@ -86,7 +89,10 @@ def main():
     d = read_all(paths)
     for r in d["report"]: print("  ", r)
     for p in d["problems"]: print("   !", p)
-    sig = hashlib.sha256(json.dumps({k: d[k] for k in ("items", "ins", "outs", "asOf", "cats", "problems")}, ensure_ascii=False).encode()).hexdigest()
+    if MODS:   # آخر تعديل فعلي لأي ملف (بتوقيت القاهرة)، مش تاريخ الجرد المكتوب جوه الشيت
+        from zoneinfo import ZoneInfo
+        d["mod"] = dt.datetime.fromtimestamp(max(MODS), ZoneInfo("Africa/Cairo")).isoformat(timespec="seconds")
+    sig = hashlib.sha256(json.dumps({k: d.get(k) for k in ("items", "ins", "outs", "asOf", "cats", "problems", "mod")}, ensure_ascii=False).encode()).hexdigest()
     live = live_version()
     if live.get("s") == sig[:8] and not FORCE:
         out("changed", "false"); print("مفيش تغيير، مفيش نشر."); return
