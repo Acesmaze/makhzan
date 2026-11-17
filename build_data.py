@@ -15,6 +15,12 @@ def _n(v):
 def _nn(v):
     return None if v is None or v == "" else _n(v)   # null = الخانة فاضية (مفيش رصيد محفوظ)
 
+_ERR = re.compile(r"^#(DIV/0!|N/A|VALUE!|REF!|NAME\?|NUM!|NULL!)$", re.I)
+def _clean(v):
+    """نص الخلية، بس أخطاء الإكسيل (#DIV/0! وأخواتها) بتتحول لفاضي."""
+    t = _s(v)
+    return "" if _ERR.match(t) else t
+
 def _d(v):
     return v.strftime("%Y-%m-%d") if isinstance(v, (dt.datetime, dt.date)) else _s(v)
 
@@ -175,7 +181,7 @@ def _moves(ws, out, mg, ro, tag):
         if not _s(r[c["name"]]): continue
         mgd = {str(oc): list(span[(i, oc)]) for oc in TXT.values() if (i, oc) in span}
         rows.append([_d(r[c["date"]]), _s(r[c["doc"]]), _s(r[c["wo"]]) if out else "", _s(r[c["name"]]),
-                     _n(r[c["w"]]), _n(r[c["c"]]), _s(r[c["p"]]), _s(r[c["h"]]), _s(r[c["note"]]), i, mgd or None, tag])
+                     _nn(r[c["w"]]), _n(r[c["c"]]), _s(r[c["p"]]), _s(r[c["h"]]), _s(r[c["note"]]), i, mgd or None, tag])
     return rows
 
 def _read_generic(path, ro, tag):
@@ -195,7 +201,7 @@ def _read_generic(path, ro, tag):
         for j, v in enumerate(H):
             t = _nzh(v)
             if not t: continue
-            key = ("name" if "اسم الصنف" in t or t == "الصنف" else "type" if t in ("النوع", "المصدر") or (t == "المخزن" and j <= 3) else
+            key = ("name" if "اسم الصنف" in t or t == "الصنف" else "type" if t in ("النوع", "المصدر", "من") or (t == "المخزن" and j <= 3) else
                    "open" if "رصيد" in t and "اول" in t else "close" if "رصيد" in t and "اخر" in t else
                    "in" if "اضاف" in t or t.startswith("وارد") else "out" if "صرف" in t or "منصرف" in t else
                    "note" if "ملاحظ" in t else None)
@@ -210,7 +216,8 @@ def _read_generic(path, ro, tag):
                 K[key] = (w, n)
             else: K[key] = j
         if "note" not in K and "close" in K:
-            K["note"] = max(x for x in K["close"] if x is not None) + 1   # لو مفيش عنوان ملاحظات: العمود اللي بعد رصيد آخر المدة
+            nj = max(x for x in K["close"] if x is not None) + 1   # لو مفيش عنوان ملاحظات: العمود اللي بعد رصيد آخر المدة، بس لو عنوانه فاضي (مش عمود تاني زي "الوزن الفعلى")
+            if nj < len(H) and not _nzh(H[nj]): K["note"] = nj
         if "name" not in K: raise ValueError("مش لاقي عمود اسم الصنف")
         for need in ("open", "close"):
             if need not in K: raise ValueError("مش لاقي عمود 'رصيد %s المدة'" % ("أول" if need == "open" else "آخر"))
@@ -224,7 +231,7 @@ def _read_generic(path, ro, tag):
             iw, inn = K.get("in", (None, None)); xw, xn = K.get("out", (None, None))
             sw_in, sw_out = gv(r, K["in"][1]) if "in" in K else None, gv(r, K["out"][1]) if "out" in K else None
             if _n(ow) or _n(cw): wt = True
-            items.append([nm, _s(gv(r, K.get("type"))), _n(ow), _n(on), 0.0, 0.0, 0.0, _s(gv(r, K.get("note"))), i,
+            items.append([nm, _clean(gv(r, K.get("type"))), (_nn(ow) if K["open"][0] is not None else None), _n(on), 0.0, 0.0, 0.0, _clean(gv(r, K.get("note"))), i,
                           _nn(cw) if K["close"][0] is not None else (None if _nn(cn) is None else 0.0), _nn(cn), tag, _nn(sw_in), _nn(sw_out)])
         mg = _merges(path)
         ins, outs = _moves(si, False, mg, ro, tag), _moves(so, True, mg, ro, tag)
@@ -278,15 +285,15 @@ def _merge_rows(rows):
     (فكل صف فيهم بيعرض الإجمالي كله)، فبناخدها مرة واحدة، وبنجمع أرصدة أول المدة بس، ونطلع الرصيد = مجموع الأول + الإضافات - الصرف."""
     a = list(rows[0]); k = len(rows)
     for r in rows[1:]:
-        for j in (2, 3, 4, 5, 6): a[j] = (a[j] or 0) + (r[j] or 0)
+        for j in (2, 3, 4, 5, 6): a[j] = None if a[j] is None and r[j] is None else (a[j] or 0) + (r[j] or 0)
         for j in (1, 7):
             t = [x for x in dict.fromkeys([a[j], r[j]]) if x]
             a[j] = " | ".join(t)
     f = rows[0]
     for cj, oj in ((9, 2), (10, 3)):
         if all(r[cj] is not None for r in rows):
-            delta = f[cj] - f[oj]          # الإضافات - الصرف (نفسها في كل صف)
-            a[cj] = sum(r[cj] for r in rows) - (k - 1) * delta
+            delta = (f[cj] or 0) - (f[oj] or 0)          # الإضافات - الصرف (نفسها في كل صف)
+            a[cj] = sum((r[cj] or 0) for r in rows) - (k - 1) * delta
     return a
 
 def _dedupe(got, items, ins, outs):

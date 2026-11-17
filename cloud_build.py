@@ -26,11 +26,34 @@ def drive():
     cr = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/drive.readonly"])
     return AuthorizedSession(cr)
 
-MODS = []   # آخر تعديل فعلي لكل ملف على الدرايف
+def dkey(f):   # ترتيب فولدرات "الرصيد فى ..." بالتاريخ اللي في الاسم (يوم-شهر-سنة)، وبعدين آخر تعديل
+    n = f["name"]; m = re.search(r"(\d{1,2})[-_/.](\d{1,2})[-_/.](\d{4})", n)
+    if m: d = (int(m[3]), int(m[2]), int(m[1]))
+    else:
+        m = re.search(r"(\d{4})[-_/.](\d{1,2})[-_/.](\d{1,2})", n); d = (int(m[1]), int(m[2]), int(m[3])) if m else (0, 0, 0)
+    return (d, f["modifiedTime"])
+
+def newest_dated_folder(s):
+    """أحدث فولدر اسمه "الرصيد فى ..." من كل الفولدرات اللي متشاركة مع حساب الخدمة (فمش مهم الفولدر الجديد اتعمل ولا اتغير اسمه)."""
+    c, tok = [], None
+    while True:
+        r = s.get("https://www.googleapis.com/drive/v3/files", params={
+            "q": "mimeType='application/vnd.google-apps.folder' and trashed=false and name contains 'الرصيد'",
+            "pageSize": 200, "pageToken": tok, "fields": "nextPageToken,files(id,name,modifiedTime)",
+            "supportsAllDrives": "true", "includeItemsFromAllDrives": "true"}, timeout=60)
+        r.raise_for_status(); j = r.json()
+        c += [f for f in j.get("files", []) if "الرصيد في" in f["name"].replace("ى", "ي")]
+        tok = j.get("nextPageToken")
+        if not tok: break
+    print("  folders found:", [f["name"] for f in c])
+    return max(c, key=dkey) if c else None
 
 def download(s, dest):
-    """بينزّل كل xlsx (وأي Google Sheet كـ xlsx) من الفولدر ومن الفولدرات اللي جواه."""
-    files, stack = [], [FOLDER]
+    """بينزّل كل xlsx (وأي Google Sheet كـ xlsx) من أحدث فولدر "الرصيد فى ..." (أو من DRIVE_FOLDER_ID لو مفيش)."""
+    best = newest_dated_folder(s)
+    start = best["id"] if best else FOLDER
+    print("  using folder:", best["name"] if best else "(DRIVE_FOLDER_ID)")
+    files, stack = [], [start]
     while stack:
         fid = stack.pop(); tok = None; dated = []
         while True:
@@ -68,9 +91,8 @@ def download(s, dest):
         if os.path.exists(p): p = os.path.join(dest, f["id"][:6] + "_" + name)
         open(p, "wb").write(r.content)
         t = dt.datetime.fromisoformat(f["modifiedTime"].replace("Z", "+00:00")).timestamp()
-        MODS.append(t)
         os.utime(p, (t, t))        # الأحدث الأول (بيفرق لو فيه نسختين من الشرائح)
-        got.append(p); print("  downloaded:", name, len(r.content) // 1024, "KB")
+        got.append(p); print("  downloaded:", name, len(r.content) // 1024, "KB", "| آخر تعديل في الدرايف:", f["modifiedTime"])
     return got
 
 def live_version():   # النسخة المنشورة حاليًا (بدون حفظ أي حالة على GitHub)
@@ -89,11 +111,9 @@ def main():
     d = read_all(paths)
     for r in d["report"]: print("  ", r)
     for p in d["problems"]: print("   !", p)
-    if MODS:   # آخر تعديل فعلي لأي ملف (بتوقيت القاهرة)، مش تاريخ الجرد المكتوب جوه الشيت
-        from zoneinfo import ZoneInfo
-        d["mod"] = dt.datetime.fromtimestamp(max(MODS), ZoneInfo("Africa/Cairo")).isoformat(timespec="seconds")
-    sig = hashlib.sha256(json.dumps({k: d.get(k) for k in ("items", "ins", "outs", "asOf", "cats", "problems", "mod")}, ensure_ascii=False).encode()).hexdigest()
+    sig = hashlib.sha256(json.dumps({k: d[k] for k in ("items", "ins", "outs", "asOf", "cats", "problems")}, ensure_ascii=False).encode()).hexdigest()
     live = live_version()
+    print("  النسخة المنشورة حاليًا:", live, "| النسخة الجديدة:", sig[:8])
     if live.get("s") == sig[:8] and not FORCE:
         out("changed", "false"); print("مفيش تغيير، مفيش نشر."); return
     d.update(v=int(live.get("v", 0)) + 1, sig=sig, built=dt.datetime.now(dt.timezone.utc).astimezone().isoformat(timespec="seconds"))
