@@ -285,6 +285,7 @@ def _read_generic(path, ro, tag):
             if need not in K: raise ValueError("مش لاقي عمود 'رصيد %s المدة'" % ("أول" if need == "open" else "آخر"))
         cmax = max(x for x in K["close"] if x is not None)
         DET = [j for j, v in enumerate(H) if j > cmax and "مخزن" in _nzh(v)]      # أعمدة نص تفاصيل اللفائف (المخزن الكبير)
+        wide = K["open"][0] is not None or K["close"][0] is not None or bool(DET)   # الملف فيه أوزان أصلًا (عمود وزن أو تفاصيل لفائف)؟ لو لأ بنشيل الوزن خالص
         st = hr + 1 + (1 if has_sub else 0)
         gv = lambda r, j: r[j] if j is not None and j < len(r) else None
         items, wt = [], False
@@ -304,20 +305,21 @@ def _read_generic(path, ro, tag):
                           cwv, _nn(cn), tag, _nn(sw_in), _nn(sw_out)])
         mg = _merges(path)
         ins, outs = _moves(si, False, mg, ro, tag), _moves(so, True, mg, ro, tag)
-        for m in ins + outs:                     # وزن الحركة مش مكتوب لكن مكتوب في الملاحظات (وزن كاما 798/8470): بناخده منها
+        for m in (ins + outs if wide else []):   # وزن الحركة مش مكتوب لكن مكتوب في الملاحظات (وزن كاما 798/8470): بناخده منها
             if not m[4] and (m[5] or 0) > 0:
                 dw, dn = _coil_w(" ".join(str(x) for x in (m[7], m[8]) if x))
                 if dw: m[4] = dw
         mvn = {}
         for m in ins: mvn.setdefault(m[3], []).append((1, m))
         for m in outs: mvn.setdefault(m[3], []).append((-1, m))
-        for it in items:                         # لسه مفيش وزن لآخر المدة: بنحسبه من حركات الصنف (أول المدة + وارد - منصرف) لو كل حركاته ليها وزن
+        for it in (items if wide else []):       # لسه مفيش وزن لآخر المدة: بنحسبه من حركات الصنف (أول المدة + وارد - منصرف) لو كل حركاته ليها وزن
             if (it[10] or 0) > 0 and not it[9] and it[0] in mvn:
                 mv = [(sg, m) for sg, m in mvn[it[0]] if (m[5] or 0) > 0]
                 if mv and all(m[4] for _, m in mv):
                     w = (it[2] or 0) + sum(sg * m[4] for sg, m in mv)
                     if w > 0: it[9] = w
-        if any(m[4] for m in ins + outs) or any(it[9] for it in items): wt = True
+        if wide and (any(m[4] for m in ins + outs) or any(it[9] for it in items)): wt = True
+        if not wide: wt = False
         titles = [" ".join(_d(c) for c in r[:5] if c not in (None, "")) for r in g[:max(hr, 3)][:3]]
         last = ""
         for r in g[:hr + 1]:
