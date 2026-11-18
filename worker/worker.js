@@ -27,10 +27,7 @@ async function changedRecently(env, token) {
   const r = await fetch("https://www.googleapis.com/drive/v3/files?" + new URLSearchParams({ q, fields: "files(id,name,modifiedTime)", pageSize: "10", supportsAllDrives: "true", includeItemsFromAllDrives: "true" }), { headers: H });
   if (!r.ok) throw new Error("drive list " + r.status + " " + (await r.text()).slice(0, 200));
   const files = (await r.json()).files || [];
-  const f = await fetch(`https://www.googleapis.com/drive/v3/files/${env.DRIVE_FOLDER_ID}?fields=modifiedTime,name&supportsAllDrives=true`, { headers: H });
-  const folder = f.ok ? await f.json() : {};
-  const folderChanged = folder.modifiedTime && folder.modifiedTime > since;
-  return { hit: files.length > 0 || !!folderChanged, files, folder };
+  return { hit: files.length > 0, files, since };      // بس ملفات اتعدّلت أو اتضافت جوا الفولدر في آخر دقيقتين ونص
 }
 
 async function dispatch(env) {
@@ -46,7 +43,7 @@ async function check(env) {
   const sa = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
   const res = await changedRecently(env, await driveToken(sa));
   if (res.hit) { await dispatch(env); return "changed -> dispatched: " + res.files.map((x) => x.name).join(", "); }
-  return "no change";
+  return "no change (since " + res.since + ")";
 }
 
 export default {

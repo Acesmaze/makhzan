@@ -24,12 +24,27 @@ def _clean(v):
 # نص زي "986/19900+1044/17340": رقم اللفة/وزنها. الوزن = مجموع الأرقام اللي بعد "/" (من غير اللي بين أقواس زي "(مقص حجاج 949/4180)")
 _COIL = re.compile(r"(?<!\d/)(?<!\d)(\d{1,6})[^\d/+()\s]{0,3}\s*/\s*(\d{3,6})(?!\d|/\d)")
 _PLAIN = re.compile(r"^\s*\d{3,6}(?:\s*\+\s*\d{3,6})*\s*$")
-def _coil_w(text, skip_paren=True):
-    t = re.sub(r"\([^)]*\)", " ", text) if skip_paren else text
+def _entries(t):
     ws = [int(b) for a, b in _COIL.findall(t) if not (int(a) <= 12 and 2020 <= int(b) <= 2035)]   # تاريخ شهر/سنة مش لفة
-    if not ws and _PLAIN.match(t):                       # لفات صغيرة مكتوبة أوزان بس: 972+1828
-        ws = [int(x) for x in re.findall(r"\d+", t)]
-    return (float(sum(ws)), len(ws))
+    if not ws and _PLAIN.match(t): ws = [int(x) for x in re.findall(r"\d+", t)]       # لفات صغيرة مكتوبة أوزان بس: 972+1828
+    return ws
+
+_PLAINW = re.compile(r"وزن\s+(?!ال[اإ]ذن|اذن)[^\d/()]{0,20}?(\d{3,6})(?![\d/])")
+def _coil_w(text, cn=None):
+    """(مجموع الوزن، عدد اللفات). القوس اللي فيه "مقص" بيتشال (اللفة دي مش في العدد)، والقوس التاني زي (9س/4990) لفة عادية.
+    لو cn (العدد في الرصيد) معروف بنختار القراءة اللي عدد لفاتها = العدد؛ ولو مفيش واحدة بتطابق بنرجع (0, 0)."""
+    t_b = re.sub(r"\([^)]*مقص[^)]*\)", " ", text); t_b = t_b.replace("(", " ").replace(")", " ")
+    t_a = re.sub(r"\([^)]*\)", " ", text)
+    if cn is None:
+        ws = _entries(t_b)
+        if not ws:
+            m = _PLAINW.search(text)                       # وزن الجلاد 30450: إجمالي وزن الحركة
+            if m: ws = [int(m.group(1))]
+        return (float(sum(ws)), len(ws))
+    for t in (t_b, t_a):
+        ws = _entries(t)
+        if ws and len(ws) == round(cn): return (float(sum(ws)), len(ws))
+    return (0.0, 0)
 
 def _d(v):
     return v.strftime("%Y-%m-%d") if isinstance(v, (dt.datetime, dt.date)) else _s(v)
@@ -47,6 +62,43 @@ def _wh(v):
     v = _s(v)
     if not v: return ""
     return v if v in WH else "غير محدد"   # أي نص حر في خانة المخزن بيتحسب غير محدد
+
+def _hidden_rows(path):
+    """الصفوف المخفية (فلتر أو Hide) لكل شيت: {اسم الشيت: {أرقام الصفوف}} — من ملف الإكسيل مباشرة."""
+    out = {}
+    try:
+        with zipfile.ZipFile(path) as z:
+            wb = z.read("xl/workbook.xml").decode("utf-8", "ignore")
+            rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8", "ignore")
+            tgt = {}
+            for m in re.finditer(r"<Relationship\b[^>]*>", rels):
+                t = m.group(0); i = re.search(r'\bId="([^"]+)"', t); g = re.search(r'\bTarget="([^"]+)"', t)
+                if i and g: tgt[i.group(1)] = g.group(1)
+            for m in re.finditer(r"<sheet\b[^>]*>", wb):
+                t = m.group(0); n = re.search(r'\bname="([^"]*)"', t); r = re.search(r'\br:id="([^"]+)"', t)
+                if not (n and r and r.group(1) in tgt): continue
+                f = tgt[r.group(1)].lstrip("/"); f = f if f.startswith("xl/") else "xl/" + f
+                xml = z.read(f).decode("utf-8", "ignore"); hs = set()
+                for mm in re.finditer(r"<row\b[^>]*>", xml):
+                    tt = mm.group(0)
+                    if re.search(r'\bhidden="(1|true)"', tt):
+                        rn = re.search(r'\br="(\d+)"', tt)
+                        if rn: hs.add(int(rn.group(1)))
+                out[n.group(1).replace("&amp;", "&")] = hs
+    except Exception:
+        pass
+    return out
+
+def _mark_hidden(path, d):
+    """بيعلّم الأصناف اللي صفها مخفي في شيت الرصيد بالإكسيل الأصلي (آخر خانة في الصنف = 1)."""
+    h = _hidden_rows(path)
+    name = next((n for n in h if "رصيد" in n), None)
+    hs = h.get(name) if name else None
+    if not hs: return
+    if all(a[8] in hs for a in d["items"]): return          # لو كل الأصناف مخفية (فلتر غلط أو ملف متصدّر) الإخفاء ملوش معنى، فنتجاهله
+    for a in d["items"]:
+        a += [None] * (15 - len(a))
+        a.append(1 if a[8] in hs else None)
 
 def _merges(path):
     """الخلايا المدموجة (Merged) لكل شيت: {اسم الشيت: [(صف1, عمود1, صف2, عمود2), ...]} — بتتقرا من ملف الإكسيل مباشرة (سريع وبيشتغل مع القراءة السريعة)."""
@@ -245,8 +297,8 @@ def _read_generic(path, ro, tag):
             det = " + ".join(t for t in (_clean(gv(r, j)) for j in DET) if t)
             cwv = _nn(cw) if K["close"][0] is not None else (None if _nn(cn) is None else 0.0)
             if det and not cwv and (_nn(cn) or 0) > 0:            # وزن آخر المدة مش مكتوب في الرصيد: بنحسبه من تفاصيل اللفائف
-                dw, dn = _coil_w(det)
-                if dw and dn == round(_nn(cn)): cwv = dw          # بس لو عدد اللفات المكتوبة = العدد في الرصيد (عشان مانعرضش وزن ناقص)
+                dw, dn = _coil_w(det, _nn(cn))
+                if dw: cwv = dw          # بس لو عدد اللفات المكتوبة = العدد في الرصيد (عشان مانعرضش وزن ناقص)
             if _n(ow) or _n(cw) or (cwv or 0): wt = True
             items.append([nm, _clean(gv(r, K.get("type"))), (_nn(ow) if K["open"][0] is not None else None), _n(on), 0.0, 0.0, 0.0, _clean(gv(r, K.get("note"))) or det, i,
                           cwv, _nn(cn), tag, _nn(sw_in), _nn(sw_out)])
@@ -254,7 +306,7 @@ def _read_generic(path, ro, tag):
         ins, outs = _moves(si, False, mg, ro, tag), _moves(so, True, mg, ro, tag)
         for m in ins + outs:                     # وزن الحركة مش مكتوب لكن مكتوب في الملاحظات (وزن كاما 798/8470): بناخده منها
             if not m[4] and (m[5] or 0) > 0:
-                dw, dn = _coil_w(" ".join(str(x) for x in (m[7], m[8]) if x), False)
+                dw, dn = _coil_w(" ".join(str(x) for x in (m[7], m[8]) if x))
                 if dw: m[4] = dw
         mvn = {}
         for m in ins: mvn.setdefault(m[3], []).append((1, m))
@@ -324,6 +376,7 @@ def _merge_rows(rows):
         if all(r[cj] is not None for r in rows):
             delta = (f[cj] or 0) - (f[oj] or 0)          # الإضافات - الصرف (نفسها في كل صف)
             a[cj] = sum((r[cj] or 0) for r in rows) - (k - 1) * delta
+    if len(a) > 15: a[15] = 1 if all(len(r) > 15 and r[15] for r in rows) else None     # مخفي بس لو كل الصفوف المكررة مخفية
     return a
 
 def _dedupe(got, items, ins, outs):
@@ -400,6 +453,7 @@ def read_all(paths):
                     except Exception:
                         d = f(False)
                     d.setdefault("wt", False)
+                _mark_hidden(p, d)
                 hit = cache[ck] = [key, k, d]; dirty = True
             key, k, d = hit
             got[key] = (p, k, copy.deepcopy(d))   # نسخة، لأن الدمج بعد كده بيعدّل في الصفوف
