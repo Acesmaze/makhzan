@@ -21,6 +21,16 @@ def _clean(v):
     t = _s(v)
     return "" if _ERR.match(t) else t
 
+# نص زي "986/19900+1044/17340": رقم اللفة/وزنها. الوزن = مجموع الأرقام اللي بعد "/" (من غير اللي بين أقواس زي "(مقص حجاج 949/4180)")
+_COIL = re.compile(r"(?<!\d/)(?<!\d)(\d{1,6})[^\d/+()\s]{0,3}\s*/\s*(\d{3,6})(?!\d|/\d)")
+_PLAIN = re.compile(r"^\s*\d{3,6}(?:\s*\+\s*\d{3,6})*\s*$")
+def _coil_w(text, skip_paren=True):
+    t = re.sub(r"\([^)]*\)", " ", text) if skip_paren else text
+    ws = [int(b) for a, b in _COIL.findall(t) if not (int(a) <= 12 and 2020 <= int(b) <= 2035)]   # تاريخ شهر/سنة مش لفة
+    if not ws and _PLAIN.match(t):                       # لفات صغيرة مكتوبة أوزان بس: 972+1828
+        ws = [int(x) for x in re.findall(r"\d+", t)]
+    return (float(sum(ws)), len(ws))
+
 def _d(v):
     return v.strftime("%Y-%m-%d") if isinstance(v, (dt.datetime, dt.date)) else _s(v)
 
@@ -221,6 +231,8 @@ def _read_generic(path, ro, tag):
         if "name" not in K: raise ValueError("مش لاقي عمود اسم الصنف")
         for need in ("open", "close"):
             if need not in K: raise ValueError("مش لاقي عمود 'رصيد %s المدة'" % ("أول" if need == "open" else "آخر"))
+        cmax = max(x for x in K["close"] if x is not None)
+        DET = [j for j, v in enumerate(H) if j > cmax and "مخزن" in _nzh(v)]      # أعمدة نص تفاصيل اللفائف (المخزن الكبير)
         st = hr + 1 + (1 if has_sub else 0)
         gv = lambda r, j: r[j] if j is not None and j < len(r) else None
         items, wt = [], False
@@ -230,12 +242,30 @@ def _read_generic(path, ro, tag):
             ow, on = (gv(r, K["open"][0]), gv(r, K["open"][1])); cw, cn = (gv(r, K["close"][0]), gv(r, K["close"][1]))
             iw, inn = K.get("in", (None, None)); xw, xn = K.get("out", (None, None))
             sw_in, sw_out = gv(r, K["in"][1]) if "in" in K else None, gv(r, K["out"][1]) if "out" in K else None
-            if _n(ow) or _n(cw): wt = True
-            items.append([nm, _clean(gv(r, K.get("type"))), (_nn(ow) if K["open"][0] is not None else None), _n(on), 0.0, 0.0, 0.0, _clean(gv(r, K.get("note"))), i,
-                          _nn(cw) if K["close"][0] is not None else (None if _nn(cn) is None else 0.0), _nn(cn), tag, _nn(sw_in), _nn(sw_out)])
+            det = " + ".join(t for t in (_clean(gv(r, j)) for j in DET) if t)
+            cwv = _nn(cw) if K["close"][0] is not None else (None if _nn(cn) is None else 0.0)
+            if det and not cwv and (_nn(cn) or 0) > 0:            # وزن آخر المدة مش مكتوب في الرصيد: بنحسبه من تفاصيل اللفائف
+                dw, dn = _coil_w(det)
+                if dw and dn == round(_nn(cn)): cwv = dw          # بس لو عدد اللفات المكتوبة = العدد في الرصيد (عشان مانعرضش وزن ناقص)
+            if _n(ow) or _n(cw) or (cwv or 0): wt = True
+            items.append([nm, _clean(gv(r, K.get("type"))), (_nn(ow) if K["open"][0] is not None else None), _n(on), 0.0, 0.0, 0.0, _clean(gv(r, K.get("note"))) or det, i,
+                          cwv, _nn(cn), tag, _nn(sw_in), _nn(sw_out)])
         mg = _merges(path)
         ins, outs = _moves(si, False, mg, ro, tag), _moves(so, True, mg, ro, tag)
-        if any(m[4] for m in ins + outs): wt = True
+        for m in ins + outs:                     # وزن الحركة مش مكتوب لكن مكتوب في الملاحظات (وزن كاما 798/8470): بناخده منها
+            if not m[4] and (m[5] or 0) > 0:
+                dw, dn = _coil_w(" ".join(str(x) for x in (m[7], m[8]) if x), False)
+                if dw: m[4] = dw
+        mvn = {}
+        for m in ins: mvn.setdefault(m[3], []).append((1, m))
+        for m in outs: mvn.setdefault(m[3], []).append((-1, m))
+        for it in items:                         # لسه مفيش وزن لآخر المدة: بنحسبه من حركات الصنف (أول المدة + وارد - منصرف) لو كل حركاته ليها وزن
+            if (it[10] or 0) > 0 and not it[9] and it[0] in mvn:
+                mv = [(sg, m) for sg, m in mvn[it[0]] if (m[5] or 0) > 0]
+                if mv and all(m[4] for _, m in mv):
+                    w = (it[2] or 0) + sum(sg * m[4] for sg, m in mv)
+                    if w > 0: it[9] = w
+        if any(m[4] for m in ins + outs) or any(it[9] for it in items): wt = True
         titles = [" ".join(_d(c) for c in r[:5] if c not in (None, "")) for r in g[:max(hr, 3)][:3]]
         last = ""
         for r in g[:hr + 1]:
