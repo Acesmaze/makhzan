@@ -86,12 +86,22 @@ table .nm{font-size:inherit;font-weight:400;line-height:normal}
  #pa th,#pa td{border:1px solid #444;padding:2px 5px;text-align:center;white-space:normal;max-width:none;height:auto}
  #pa th{background:#ddd}#pa thead{display:table-header-group}#pa tr{page-break-inside:avoid}
  #pa td.l{text-align:right}#pa td.b{font-weight:700}}
+#pd{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;align-items:center;justify-content:center;direction:rtl}
+.pdb{background:#fff;border-radius:14px;padding:16px 18px;width:min(520px,94vw);max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:10px;font-size:16px}
+.pdb h3{margin:0}.pdb label{display:block;cursor:pointer}#pl{max-height:260px;overflow:auto;border:1px solid #ccd;border-radius:8px;padding:6px;margin-top:6px}#pl label{padding:3px 2px;font-size:15px}#pl label[hidden]{display:none}
+#pq{width:100%;box-sizing:border-box;padding:7px;font-size:16px}.pbt{display:flex;gap:8px;align-items:center;margin-top:6px}.pbt button{padding:8px 14px;font-size:15px}.pbt .go{background:#16244f;color:#fff;border:0;border-radius:8px;font-weight:700}
+@media print{#pa,#pa *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ #pa h2{color:#16244f;font-size:20px}#pa p{font-size:12px}
+ #pa table{font-size:14px}#pa th,#pa td{border:1px solid #9aa4c4;padding:5px 8px}
+ #pa th{background:#16244f;color:#fff;font-size:14px}#pa tbody tr:nth-child(even){background:#eef1fa}
+ #pa td.nn,#pa th.nn{width:44px;background:#dfe5f7;color:#16244f;font-weight:700}#pa th.nn{background:#0d1636;color:#fff}
+ #pa td.nmc{font-size:15px}#pa td.bl{color:#16244f;font-size:16px}#pa tr.neg td.bl{color:#c00000}#pa tr.zr td{color:#888}}
 </style></head><body>
 <div class="tb"><button id="bk" style="display:none">🏠 الرئيسية</button><b>مخزن حجاج — للقراءة فقط</b><input id="q" type="search" placeholder="بحث (Ctrl+F)  مثال: 78 0.7" autocomplete="off"><select id="cs"></select><button id="vm"></button><button id="pr" title="طباعة القسم المختار" style="display:none">🖨 طباعة</button><button id="zo" class="zb" title="تصغير الجدول">🔍−</button><button id="zi" class="zb" title="تكبير الجدول">🔍＋</button><button id="dl" title="تحميل ملف الإكسيل الأصلي من الجهاز الرئيسي">⬇ تحميل الإكسيل</button><small>آخر تحديث <span id="asof">—</span> · <span id="sync"></span></small></div>
 <div class="rb" id="rb"><span id="wl">تصفية:</span><select id="w"><option value="all">كل المخازن</option><option>الكبير</option><option>الشامى</option><option>المصنع</option></select><label><input type="checkbox" id="f" checked> فيه رصيد فقط</label><label><input type="checkbox" id="mm"> ⚠ عدم تطابق فقط</label><label><input type="checkbox" id="sh"> إظهار المخفي في الإكسيل</label><button id="ex" title="ينسخ الأصناف اللي اتجردت، تلصقها في إكسيل">نسخ نتيجة الجرد</button></div>
 <div class="rb" id="onb" style="display:none"><b></b><button id="oc">✕ رجوع لكل الأصناف</button></div>
 <div class="fb"><span class="nb" id="nb">A1</span><span class="fx">fx</span><div id="fv"></div></div>
-<div id="pa"></div><div id="gw" tabindex="0"><table id="g"></table></div><div id="dt"></div><div id="cv"></div>
+<div id="pa"></div><div id="pd"></div><div id="gw" tabindex="0"><table id="g"></table></div><div id="dt"></div><div id="cv"></div>
 <div class="bt"><div class="tabs" id="tabs"><button data-v="bal" class="on">الرصيد</button><button data-v="in">الاضافات</button><button data-v="out">الصرف</button></div><div id="sb"></div></div><div id="dlg"></div>
 <script>
 
@@ -112,6 +122,7 @@ function build(D){M=new Map();AL=[];TT=D.titles||[];TTL={};CATS.length=1;(D.cats
  AL.sort(so);AL.forEach(m=>{m.k=nz([m.name,m.p,m.h,m.doc,m.wo,m.note].join(" "));m.dim=dim(m.name)})}
 /* البحث: كلمات عادية تتطابق، والأرقام (سمك/عرض) بتجيب الأقرب */
 function dist(d,nums){if(!d)return 1e9;let s=0;nums.forEach(v=>{if(v<=3)s+=1.5*Math.abs(d[0]-v)/Math.max(v,.1);else s+=Math.abs(d[1]-v)/v});return s}
+function numItems_unused(){const c={};[...M.values()].filter(o=>o.r&&!o.extra).sort((a,b)=>a.r-b.r).forEach(o=>{const k=catOf(o.n)||"";o.no=c[k]=(c[k]||0)+1})}
 function run(){$("onb").style.display=ONLY?"":"none";$("onb").firstElementChild.textContent=ONLY?"عرض صنف واحد فقط: "+ONLY.trim():"";const toks=nz($("q").value).split(" ").filter(Boolean),nums=[],docs=[],txt=[];
  toks.forEach(t=>{if(/^[0-9.]+$/.test(t)){const v=parseFloat(t);(v>=400||(/^\d+$/.test(t)&&t.length>=4))?docs.push(t):isP(CAT)?txt.push(t):nums.push(v)}else txt.push(t)});
  const near=new Map();
@@ -124,7 +135,7 @@ function run(){$("onb").style.display=ONLY?"":"none";$("onb").firstElementChild.
  else{LIST=AL.filter(m=>m.t===(TAB==="in"?"i":"o")&&(!ONLY||m.name===ONLY)&&ok(m.k)&&(!nums.length||near.has(m.name)));
   if(nums.length)LIST.sort((a,b)=>near.get(a.name)-near.get(b.name)||(b.d<a.d?-1:b.d>a.d?1:0))}
  if(CAT)LIST=LIST.filter(x=>catOf(x.n||x.name)===CAT);
- FIL=!!(toks.length||W!=="all"||F);SHOWN=300;SM=60;S={ar:0,ac:0,fr:0,fc:0};VIEW==="sm"?cards():paint()}
+ if(TAB==="bal")LIST.forEach((o,i)=>o.no=i+1);FIL=!!(toks.length||W!=="all"||F);SHOWN=300;SM=60;S={ar:0,ac:0,fr:0,fc:0};VIEW==="sm"?cards():paint()}
 let FIL=false;
 const nc=(x,e)=>x==null?'<td class="n z'+(e||"")+'">-</td>':'<td class="n'+(x<0?" neg":x===0?" z":"")+(e||"")+'">'+(x===0?"0":fm(x))+'</td>',nwv=(o,x)=>o.nw?null:x;
 /* خلية مدموجة في الإكسيل (زي رقم البسكول لعدة أصناف): بتتعرض كخلية واحدة والقيمة في نص المجموعة */
@@ -143,7 +154,7 @@ function paint(){const bal=TAB==="bal";let cols,h="",b="";
   const ttl=i=>'<tr>'+rnc(i+1)+'<td class="ov"><span>'+((TTL[CAT]||[])[i]||"")+'</span></td>'+E(cols-1)+'</tr>';
   const r4=W2?["م","اســـم الصنــــف","النوع","رصيد اول المدة","","الاضافات","","الصرف","","رصيد اخر المدة","","ملاحظات","⚠ عدم تطابق"]:["م","اســـم الصنــــف","النوع","رصيد اول المدة","الاضافات","الصرف","رصيد اخر المدة","ملاحظات","⚠ عدم تطابق"],r5=W2?["","","","وزن","عدد","وزن","عدد","وزن","عدد","وزن","عدد","",""]:["","","","عدد","عدد","عدد","عدد","",""];
   h=ttl(0)+ttl(1)+ttl(2)+'<tr class="hd">'+rnc(4)+hdr(r4,20)+'</tr><tr class="hd">'+rnc(5)+r5.map(x=>'<td style="top:40px">'+x+'</td>').join("")+'</tr>';
-  LIST.slice(0,SHOWN).forEach(o=>{b+='<tr>'+rnc(o.r||"",1)+tc(o.r?o.r-5:"")+tc(o.n.trim(),"nm")+tc(o.extra?"مش في الشيت":o.store)+(W2?nc(nwv(o,o.ow))+nc(o.on)+nc(nwv(o,o.iw))+nc(o.inn)+nc(nwv(o,o.xw))+nc(o.xn)+nc(nwv(o,o.bw))+nc(o.bn):nc(o.on)+nc(o.inn)+nc(o.xn)+nc(o.bn))+tc(o.note)+tc(ppi(o).join(" | "),"o")+'</tr>'})}
+  LIST.slice(0,SHOWN).forEach(o=>{b+='<tr>'+rnc(o.r||"",1)+tc(o.no||"")+tc(o.n.trim(),"nm")+tc(o.extra?"مش في الشيت":o.store)+(W2?nc(nwv(o,o.ow))+nc(o.on)+nc(nwv(o,o.iw))+nc(o.inn)+nc(nwv(o,o.xw))+nc(o.xn)+nc(nwv(o,o.bw))+nc(o.bn):nc(o.on)+nc(o.inn)+nc(o.xn)+nc(o.bn))+tc(o.note)+tc(ppi(o).join(" | "),"o")+'</tr>'})}
  else if(bal){const WHS=["الكبير","الشامى","المصنع","غير محدد"].filter(w=>[...M.values()].some(o=>!o.pp&&o.wh[w]&&(o.wh[w].w||o.wh[w].n)));
   cols=15+WHS.length*2;const E=n=>'<td></td>'.repeat(n);
   const ttl=(i)=>'<tr>'+rnc(i+1)+'<td class="ov"><span>'+(TT[i]||"")+'</span></td>'+E(cols-1)+'</tr>';
@@ -151,7 +162,7 @@ function paint(){const bal=TAB==="bal";let cols,h="",b="";
   const r5=["","","","وزن","عدد","وزن","عدد","وزن","عدد","وزن","عدد","الكبير","الشامى","الجديد",""];WHS.forEach(()=>r5.push("وزن","عدد"));
   h=ttl(0)+ttl(1)+ttl(2)+'<tr class="hd">'+rnc(4)+hdr(r4,20)+'</tr><tr class="hd">'+rnc(5)+r5.map(x=>'<td style="top:40px">'+x+'</td>').join("")+'</tr>';
   LIST.slice(0,SHOWN).forEach(o=>{const gone=!o.bw&&!o.bn;
-   b+='<tr>'+rnc(o.r||"",1)+tc(o.r?o.r-5:"")+tc(o.n.trim(),"nm")+tc(o.extra?"مش في الشيت":o.store)+nc(nwv(o,o.ow))+nc(o.on)+nc(nwv(o,o.iw))+nc(o.inn)+nc(nwv(o,o.xw))+nc(o.xn)+nc(nwv(o,o.bw))+nc(o.bn)+(o.cust?tc("📌 "+o.cust,"cu")+tc("")+tc(""):o.ex.map(x=>nc(x)).join(""))+tc(o.note)
+   b+='<tr>'+rnc(o.r||"",1)+tc(o.no||"")+tc(o.n.trim(),"nm")+tc(o.extra?"مش في الشيت":o.store)+nc(nwv(o,o.ow))+nc(o.on)+nc(nwv(o,o.iw))+nc(o.inn)+nc(nwv(o,o.xw))+nc(o.xn)+nc(nwv(o,o.bw))+nc(o.bn)+(o.cust?tc("📌 "+o.cust,"cu")+tc("")+tc(""):o.ex.map(x=>nc(x)).join(""))+tc(o.note)
     +WHS.map(w=>{const v=gone?{w:0,n:0}:(o.wh[w]||{w:0,n:0});return nc(v.w)+nc(v.n)}).join("")+'</tr>'});
  }else{const PM=P&&!W2;cols=PM?9:11;const H=PM?["التاريخ","رقم الأذن","امر الشغل","الحركة","الصنف","عدد",TAB==="in"?"وارد من":"منصرف الى","طبلية / بسكول","ملاحظات"]:["التاريخ","رقم الأذن","امر الشغل","الحركة","الصنف","الوحدة","وزن","عدد",TAB==="in"?"وارد من":"منصرف الى","المخزن","ملاحظات"];
   h='<tr class="hd">'+rnc(1)+H.map(x=>'<td style="top:20px">'+x+'</td>').join("")+'</tr>';
@@ -227,7 +238,7 @@ function cards(){const bal=TAB==="bal",P=isP(CAT);
   $("cv").innerHTML='<div class="hdr"><img src="'+LOGO+'" alt="Haggag Steel"><div><h1>مخزن حجاج</h1><p>Haggag Steel · DR. MAHMOUD HAGGAG</p></div></div><div class="cn">اختر القسم</div>'+cs.map(c=>'<div class="cd ct" data-c="'+c.id+'"><div class="nm">'+c.n+'</div><div class="bg"><b>'+c.k+'</b> صنف فيه رصيد'+(c.m?' <span class="o">· ⚠ '+c.m+' عدم تطابق</span>':"")+'</div>'+(c.h?'<div class="hid">+ '+c.h+' صنف رصيدهم صفر لكن في مخازنهم أرقام (بتظهر لو شلت "فيه رصيد فقط")</div>':"")+(c.x?'<div class="hid">+ '+c.x+' صنف مخفي في الإكسيل الأصلي (بيظهروا لو علّمت "إظهار المخفي في الإكسيل")</div>':"")+'</div>').join("");return}let h='<div class="catb">📂 '+esc((CATS.find(c=>c.id===CAT)||{n:"أخرى"}).n)+'<small>'+({bal:"الرصيد",in:"الاضافات",out:"الصرف"}[TAB]||"")+'</small></div><div class="cn">'+(LIST.length?LIST.length+(bal?" صنف":TAB==="in"?" إضافة":" صرف")+(bal?" · اضغط على الصنف لفتح الجرد والحركات":" · اضغط على الحركة لعرض تفاصيلها وكل حركات الصنف"):"مفيش نتائج، جرّب كلمة أو رقم تاني")+"</div>"+(()=>{const T=tot1(),P2=isP(CAT);return T?'<div class="cn" style="font-weight:700;font-size:15px;color:'+(T.i?"#157a3a":"#b3261e")+'">إجمالي الصنف ('+(T.i?"وارد":"منصرف")+"): عدد "+T.c+(P2&&!isW(CAT)?"":" · وزن "+T.w)+"</div>":""})();
  if(bal&&MM&&F){const hid=[...M.values()].filter(o=>(!CAT||catOf(o.n)===CAT)&&mis(o)&&!(o.bw||o.bn)).length;if(hid)h+='<div class="cn hid">+ '+hid+' صنف تاني رصيدهم صفر لكن في مخازنهم أرقام، مخبّيين بسبب "فيه رصيد فقط". شيل العلامة دي عشان تشوفهم.</div>'}
  LIST.slice(0,SM).forEach(o=>{if(bal){const sx=sumx(o),bad=mis(o),w=o.extra?"<i>مش في شيت الرصيد</i>":P?"<i>"+esc(o.store)+"</i>"+(o.note?"<i>"+esc(o.note)+"</i>":""):o.cust?"":["الكبير","الشامى","الجديد"].map((k,j)=>"<i"+(o.ex[j]?"":' class="z0"')+">"+k+" "+fm(o.ex[j])+"</i>").join("");
-  h+='<div class="cd'+(bad?" bad":"")+'" data-n="'+esc(o.n)+'"><div class="nm">'+(o.r?'<span class="no">بند '+(o.r-5)+"</span> ":"")+esc(o.n.trim())+'</div><div class="bg'+(o.bn<0?" neg":!o.bn&&!o.bw?" z":"")+'"><small>'+(P?"الرصيد":"الرصيد الكامل")+'</small>'+(P&&o.bw&&!o.bn?'<b>'+fm(o.bw)+'</b> وزن <span class="df">'+diff(o)+'</span>':'<b>'+fm(o.bn)+'</b> عدد'+(P&&!isW(CAT)?"":' <b class="wb">'+(o.nw?"-":fm(o.bw))+'</b> وزن')+' <span class="df">'+diff(o)+'</span>')+'</div>'+(o.cust&&!P?'<div class="cu2">📌 '+esc(o.cust)+'<small>مكتوب في الإكسيل بدل أعداد المخازن، فمش بيتحسب عدم تطابق</small></div>':"")+(o.extra||P||o.cust?"":'<div class="ln"><small>مجموع المخازن</small><b>'+fm(sx)+'</b> عدد</div>')+'<div class="ch">'+w+"</div>"+(bad?'<div class="al">⚠ عدم تطابق: '+(P?ppi(o).map(esc).join("<br>⚠ "):"الرصيد الكامل "+fm(o.bn)+' ≠ مجموع المخازن '+fm(sx)+' (الفرق '+fm(Math.abs(f(o.bn-sx)))+')')+'<br><button class="xb" data-x="'+esc(o.n)+'">📊 افتح الصنف ده في شكل الإكسيل</button></div>':"");
+  h+='<div class="cd'+(bad?" bad":"")+'" data-n="'+esc(o.n)+'"><div class="nm">'+(o.no?'<span class="no">بند '+o.no+"</span> ":"")+esc(o.n.trim())+'</div><div class="bg'+(o.bn<0?" neg":!o.bn&&!o.bw?" z":"")+'"><small>'+(P?"الرصيد":"الرصيد الكامل")+'</small>'+(P&&o.bw&&!o.bn?'<b>'+fm(o.bw)+'</b> وزن <span class="df">'+diff(o)+'</span>':'<b>'+fm(o.bn)+'</b> عدد'+(P&&!isW(CAT)?"":' <b class="wb">'+(o.nw?"-":fm(o.bw))+'</b> وزن')+' <span class="df">'+diff(o)+'</span>')+'</div>'+(o.cust&&!P?'<div class="cu2">📌 '+esc(o.cust)+'<small>مكتوب في الإكسيل بدل أعداد المخازن، فمش بيتحسب عدم تطابق</small></div>':"")+(o.extra||P||o.cust?"":'<div class="ln"><small>مجموع المخازن</small><b>'+fm(sx)+'</b> عدد</div>')+'<div class="ch">'+w+"</div>"+(bad?'<div class="al">⚠ عدم تطابق: '+(P?ppi(o).map(esc).join("<br>⚠ "):"الرصيد الكامل "+fm(o.bn)+' ≠ مجموع المخازن '+fm(sx)+' (الفرق '+fm(Math.abs(f(o.bn-sx)))+')')+'<br><button class="xb" data-x="'+esc(o.n)+'">📊 افتح الصنف ده في شكل الإكسيل</button></div>':"");
   if(OPEN===o.n)h+='<div class="ex"><button class="xb" data-x="'+esc(o.n)+'">📊 افتح الصنف ده في شكل الإكسيل</button><br><label>الجرد الفعلي (عدد)<input type="number" inputmode="decimal" data-n="'+esc(o.n)+'" value="'+(CNT[o.n]==null?"":esc(CNT[o.n]))+'"></label> <span class="df">'+diff(o)+'</span><div>رصيد الحركات (أول المدة + إضافات − صرف): <b>'+fm(o.pn)+'</b> عدد'+(P&&!isW(CAT)?"":" · <b>"+(P&&o.mv.some(m=>m.c>0&&!m.w)?"-":fm(o.pw))+"</b> وزن")+'</div><div class="mvl"><b>آخر الحركات</b>'+(o.mv.slice(0,10).map(m=>"<div>"+m.d+' · <span class="'+m.t+'">'+(m.t==="i"?"وارد":"منصرف")+"</span> "+fm(m.c)+" عدد"+(P&&!isW(CAT)?"":" · "+fm(m.w)+" وزن")+" · "+esc(m.p)+(m.h?" · "+esc(m.h):"")+(P&&m.note?" · "+esc(m.note):"")+"</div>").join("")||"<div>مفيش حركات</div>")+"</div></div>";
   h+="</div>"}
   else{const mk=o.t+"|"+o.r+"|"+o.name;h+='<div class="cd" data-mk="'+esc(mk)+'"><div class="r1"><span class="bd '+m(o)+'">'+(o.t==="i"?"وارد":"منصرف")+"</span><span>"+o.d+'</span></div><div class="nm">'+esc(o.name.trim())+'</div><div class="bg"><b>'+fm(o.c)+'</b> عدد'+(P&&!isW(CAT)?"":' <b class="wb">'+(o.w==null?"-":fm(o.w))+'</b> وزن')+'</div><div class="ch"><i>'+(TAB==="in"?"من: ":"إلى: ")+esc(o.p)+"</i>"+(o.h?"<i>"+esc(o.h)+"</i>":"")+"<i>إذن "+esc(o.doc)+"</i>"+(o.note?"<i>"+esc(o.note)+"</i>":"")+"</div>"+(OPM===mk?(()=>{const it=M.get(o.name),same=it?it.mv.filter(x=>x.t===o.t):[];
@@ -240,16 +251,36 @@ $("cv").onclick=e=>{const xb=e.target.closest("[data-x]");if(xb){openXl(xb.datas
 $("cv").oninput=e=>{const n=e.target.dataset.n;if(n==null)return;CNT[n]=e.target.value;try{localStorage.setItem("mkhzn_cnt",JSON.stringify(CNT))}catch(_){}e.target.closest(".cd").querySelectorAll(".df").forEach(x=>x.innerHTML=diff(M.get(n)))};
 $("ex").onclick=()=>{const t=Object.keys(CNT).filter(n=>CNT[n]!==""&&M.has(n)).map(n=>[n.trim(),M.get(n).bn,CNT[n],f(CNT[n]-M.get(n).bn)].join("\t"));if(!t.length)return alert("لسه ما سجلتش أي جرد");const x="الصنف\tرصيد البرنامج\tالجرد الفعلي\tالفرق\n"+t.join("\n");try{navigator.clipboard.writeText(x);alert("اتنسخ "+t.length+" صنف. الصقهم في إكسيل")}catch(_){prompt("انسخ:",x)}};
 function setView(v){VIEW=v;if(v==="sm")ONLY=null;if(v==="xl"&&CAT===null)CAT=CATS[0].id;try{localStorage.setItem("mkhzn_view",v)}catch(_){}document.body.classList.toggle("sm",v==="sm");$("vm").textContent=v==="sm"?"شكل الإكسيل":"الشكل المبسط";$("ex").style.display=v==="sm"?"":"none";setCat(CAT)}
-function doPrint(){if(CAT===null)return;const P=isP(CAT),W2=isW(CAT),bal=TAB==="bal",cn=(CATS.find(c=>c.id===CAT)||{}).n||$("cs").selectedOptions[0].textContent;
- const E=x=>esc(x==null||x===""?"":x),N=x=>x==null?"-":x===0?"0":fm(x),no=n=>{const o=M.get(n);return o&&o.r?o.r-5:"—"};
- const tt=bal?"الرصيد":TAB==="in"?"الإضافات":"المنصرف";let h,b="";
- if(bal){const wt=!P||W2;h="<th>بند</th><th>الصنف</th><th>"+(P?"النوع":"المخزن")+"</th>"+(wt?"<th>وزن أول</th>":"")+"<th>عدد أول</th>"+(wt?"<th>وزن إضافات</th>":"")+"<th>عدد إضافات</th>"+(wt?"<th>وزن صرف</th>":"")+"<th>عدد صرف</th>"+(wt?"<th>وزن رصيد</th>":"")+"<th>عدد رصيد</th><th>ملاحظات</th>";
-  LIST.forEach(o=>{b+="<tr><td class='b'>"+(o.r?o.r-5:"—")+"</td><td class='l b'>"+E(o.n.trim())+"</td><td>"+E(o.extra?"مش في الشيت":o.store)+"</td>"+(wt?"<td>"+N(nwv(o,o.ow))+"</td>":"")+"<td>"+N(o.on)+"</td>"+(wt?"<td>"+N(nwv(o,o.iw))+"</td>":"")+"<td>"+N(o.inn)+"</td>"+(wt?"<td>"+N(nwv(o,o.xw))+"</td>":"")+"<td>"+N(o.xn)+"</td>"+(wt?"<td>"+N(nwv(o,o.bw))+"</td>":"")+"<td class='b'>"+N(o.bn)+"</td><td class='l'>"+E(o.cust?"📌 "+o.cust:o.note)+"</td></tr>"})}
- else{const wt=!P||W2;h="<th>التاريخ</th><th>رقم الأذن</th><th>امر الشغل</th><th>بند</th><th>الصنف</th>"+(wt?"<th>وزن</th>":"")+"<th>عدد</th><th>"+(TAB==="in"?"وارد من":"منصرف الى")+"</th><th>ملاحظات</th>";
-  LIST.forEach(m=>{b+="<tr><td>"+E(m.d)+"</td><td>"+E(m.doc)+"</td><td>"+E(m.wo)+"</td><td class='b'>"+no(m.name)+"</td><td class='l b'>"+E(m.name.trim())+"</td>"+(wt?"<td>"+N(m.w)+"</td>":"")+"<td>"+N(m.c)+"</td><td class='l'>"+E(m.p)+"</td><td class='l'>"+E([m.h,m.note].filter(Boolean).join(" - "))+"</td></tr>"})}
- $("pa").innerHTML="<h2>مخزن حجاج — "+E(cn)+" — "+tt+"</h2><p>"+LIST.length+" "+(bal?"صنف":"حركة")+" · تاريخ الطباعة "+new Date().toLocaleDateString("ar-EG")+" · آخر تحديث "+E($("asof").textContent)+"</p><table><thead><tr>"+h+"</tr></thead><tbody>"+b+"</tbody></table>";
+function pItems(){const bal=TAB==="bal",seen=new Set(),r=[];LIST.forEach(x=>{const n=bal?x.n:x.name;if(!seen.has(n)){seen.add(n);r.push({n,no:bal?x.no:""})}});return r}
+function openPD(){if(CAT===null)return;const it=pItems();let h='<div class="pdb"><h3>🖨 طباعة — '+esc((CATS.find(c=>c.id===CAT)||{}).n||"")+'</h3>'
+ +'<label><input type="radio" name="ps" value="all" checked> كل الأصناف المعروضة ('+it.length+')</label>'
+ +'<label><input type="radio" name="ps" value="sel"> أصناف معينة أختارها</label>'
+ +'<div id="pls" style="display:none"><input id="pq" type="search" placeholder="بحث في الأصناف"><div class="pbt"><button id="pall">تحديد الكل</button><button id="pnone">إلغاء الكل</button> <span id="pcn"></span></div><div id="pl">'
+ +it.map((x,i)=>'<label data-k="'+esc(nz(x.n))+'"><input type="checkbox" value="'+i+'"> '+(x.no?'<b>'+x.no+'</b> ':'')+esc(x.n.trim())+'</label>').join("")+'</div></div>'
+ +'<label><input type="checkbox" id="pfull"> نسخة كاملة بكل الأعمدة (الافتراضي: نسخة مبسطة)</label>'
+ +'<div class="pbt"><button id="pgo" class="go">🖨 اطبع</button><button id="pcx">إلغاء</button></div></div>';
+ const d=$("pd");d.innerHTML=h;d.style.display="flex";
+ const cnt=()=>{$("pcn").textContent=d.querySelectorAll('#pl input:checked').length+" مختار"};
+ d.querySelectorAll('[name=ps]').forEach(r=>r.onchange=()=>{$("pls").style.display=d.querySelector('[name=ps]:checked').value==="sel"?"":"none"});
+ $("pall").onclick=()=>{d.querySelectorAll('#pl label:not([hidden]) input').forEach(c=>c.checked=true);cnt()};$("pnone").onclick=()=>{d.querySelectorAll('#pl input').forEach(c=>c.checked=false);cnt()};
+ $("pl").onchange=cnt;cnt();$("pq").oninput=()=>{const q=nz($("pq").value).split(" ").filter(Boolean);d.querySelectorAll('#pl label').forEach(l=>l.hidden=!q.every(t=>l.dataset.k.includes(t)))};
+ $("pcx").onclick=()=>{d.style.display="none"};d.onclick=e=>{if(e.target===d)d.style.display="none"};
+ $("pgo").onclick=()=>{let pick=null;if(d.querySelector('[name=ps]:checked').value==="sel"){pick=new Set([...d.querySelectorAll('#pl input:checked')].map(c=>it[+c.value].n));if(!pick.size){alert("اختار صنف واحد على الأقل");return}}
+  d.style.display="none";doPrint(pick,$("pfull").checked)}}
+function doPrint(pick,full){const P=isP(CAT),W2=isW(CAT),bal=TAB==="bal",cn=(CATS.find(c=>c.id===CAT)||{}).n||"";
+ const E=x=>esc(x==null||x===""?"":x),N=x=>x==null?"-":x===0?"0":fm(x),wt=!P||W2;
+ const tt=bal?"الرصيد":TAB==="in"?"الإضافات":"المنصرف";let h,b="",rows=LIST.filter(x=>!pick||pick.has(bal?x.n:x.name));
+ if(bal){const sm=!full;
+  if(sm)h="<th class=nn>بند</th><th>الصنف</th><th>"+(P?"النوع":"المخزن")+"</th><th>العدد</th>"+(wt?"<th>الوزن</th>":"")+"<th>تفاصيل / ملاحظات</th>";
+  else h="<th class=nn>بند</th><th>الصنف</th><th>"+(P?"النوع":"المخزن")+"</th>"+(wt?"<th>وزن أول</th>":"")+"<th>عدد أول</th>"+(wt?"<th>وزن إضافات</th>":"")+"<th>عدد إضافات</th>"+(wt?"<th>وزن صرف</th>":"")+"<th>عدد صرف</th>"+(wt?"<th>وزن رصيد</th>":"")+"<th>عدد رصيد</th><th>ملاحظات</th>";
+  rows.forEach(o=>{const cl=o.bn<0?" neg":(!o.bn&&!o.bw)?" zr":"",det=o.cust?"📌 "+o.cust:(P?o.note:["الكبير","الشامى","الجديد"].map((k,j)=>o.ex[j]?k+" "+fm(o.ex[j]):"").filter(Boolean).join(" · ")+(o.note?" — "+o.note:""));
+   b+="<tr class='"+cl+"'><td class=nn>"+(o.no||"—")+"</td><td class='l nmc'>"+E(o.n.trim())+"</td><td>"+E(o.extra?"مش في الشيت":o.store)+"</td>"+(sm?"<td class='b bl'>"+N(o.bn)+"</td>"+(wt?"<td class='b'>"+N(nwv(o,o.bw))+"</td>":"")+"<td class='l'>"+E(det)+"</td>"
+    :(wt?"<td>"+N(nwv(o,o.ow))+"</td>":"")+"<td>"+N(o.on)+"</td>"+(wt?"<td>"+N(nwv(o,o.iw))+"</td>":"")+"<td>"+N(o.inn)+"</td>"+(wt?"<td>"+N(nwv(o,o.xw))+"</td>":"")+"<td>"+N(o.xn)+"</td>"+(wt?"<td class='b'>"+N(nwv(o,o.bw))+"</td>":"")+"<td class='b bl'>"+N(o.bn)+"</td><td class='l'>"+E(det)+"</td>")+"</tr>"})}
+ else{h="<th>التاريخ</th><th>رقم الأذن</th><th>امر الشغل</th><th>الصنف</th>"+(wt?"<th>وزن</th>":"")+"<th>عدد</th><th>"+(TAB==="in"?"وارد من":"منصرف الى")+"</th><th>ملاحظات</th>";
+  rows.forEach(m=>{b+="<tr><td>"+E(m.d)+"</td><td>"+E(m.doc)+"</td><td>"+E(m.wo)+"</td><td class='l nmc'>"+E(m.name.trim())+"</td>"+(wt?"<td>"+N(m.w)+"</td>":"")+"<td class='b bl'>"+N(m.c)+"</td><td class='l'>"+E(m.p)+"</td><td class='l'>"+E([m.h,m.note].filter(Boolean).join(" - "))+"</td></tr>"})}
+ $("pa").innerHTML="<h2>مخزن حجاج — "+E(cn)+" — "+tt+"</h2><p>"+rows.length+" "+(bal?"صنف":"حركة")+(pick?" (أصناف مختارة)":"")+" · تاريخ الطباعة "+new Date().toLocaleDateString("ar-EG")+" · آخر تحديث "+E($("asof").textContent)+"</p><table><thead><tr>"+h+"</tr></thead><tbody>"+b+"</tbody></table>";
  window.print()}
-$("pr").onclick=doPrint;window.addEventListener("afterprint",()=>{$("pa").innerHTML=""});
+$("pr").onclick=openPD;window.addEventListener("afterprint",()=>{$("pa").innerHTML=""});
 function setCat(c){CAT=c;fillCs();$("cs").value=c||CATS[0].id;const pp=isP(c);if(pp&&W!=="all"){W="all";$("w").value="all"}$("w").style.display=$("wl").style.display=pp?"none":"";document.body.classList.toggle("hm",VIEW==="sm"&&c===null);$("bk").style.display=VIEW==="sm"&&c===null?"none":"";$("gw").scrollTop=0;$("cv").scrollTop=0;$("pr").style.display=c===null?"none":"";if(M.size)run()}
 function fillCs(){let o=CATS.map(c=>[c.id,c.n]);if([...M.values()].some(x=>catOf(x.n)==="ot"))o.push(["ot","أخرى"]);const h=o.map(x=>'<option value="'+x[0]+'">'+x[1]+"</option>").join("");if($("cs").innerHTML!==h)$("cs").innerHTML=h}
 $("cs").onchange=e=>{OPEN=null;ONLY=null;$("q").value="";setCat(e.target.value)};
