@@ -90,7 +90,7 @@ table .nm{font-size:inherit;font-weight:400;line-height:normal}
 .pdb{background:#fff;border-radius:14px;padding:16px 18px;width:min(520px,94vw);max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:10px;font-size:16px}
 .pdb h3{margin:0}.pdb label{display:block;cursor:pointer}#pl{max-height:260px;overflow:auto;border:1px solid #ccd;border-radius:8px;padding:6px;margin-top:6px}#pl label{padding:3px 2px;font-size:15px}#pl label[hidden]{display:none}
 #pq{width:100%;box-sizing:border-box;padding:7px;font-size:16px}.pbt{display:flex;gap:8px;align-items:center;margin-top:6px}.pbt button{padding:8px 14px;font-size:15px}.pbt .go{background:#16244f;color:#fff;border:0;border-radius:8px;font-weight:700}
-@media print{#pa,#pa *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media print{html,body{height:auto!important;min-height:0!important;overflow:visible!important;position:static!important;display:block!important}#pa{position:static!important;overflow:visible!important;height:auto!important}#pa,#pa *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
  #pa h2{color:#16244f;font-size:20px}#pa p{font-size:12px}
  #pa table{font-size:14px}#pa th,#pa td{border:1px solid #9aa4c4;padding:5px 8px}
  #pa th{background:#16244f;color:#fff;font-size:14px}#pa tbody tr:nth-child(even){background:#eef1fa}
@@ -271,10 +271,10 @@ function doPrint(pick,full){const P=isP(CAT),W2=isW(CAT),bal=TAB==="bal",cn=(CAT
  const E=x=>esc(x==null||x===""?"":x),N=x=>x==null?"-":x===0?"0":fm(x),wt=!P||W2;
  const tt=bal?"الرصيد":TAB==="in"?"الإضافات":"المنصرف";let h,b="",rows=LIST.filter(x=>!pick||pick.has(bal?x.n:x.name));
  if(bal){const sm=!full;
-  if(sm)h="<th class=nn>بند</th><th>الصنف</th><th>"+(P?"النوع":"المخزن")+"</th><th>العدد</th>"+(wt?"<th>الوزن</th>":"")+"<th>تفاصيل / ملاحظات</th>";
-  else h="<th class=nn>بند</th><th>الصنف</th><th>"+(P?"النوع":"المخزن")+"</th>"+(wt?"<th>وزن أول</th>":"")+"<th>عدد أول</th>"+(wt?"<th>وزن إضافات</th>":"")+"<th>عدد إضافات</th>"+(wt?"<th>وزن صرف</th>":"")+"<th>عدد صرف</th>"+(wt?"<th>وزن رصيد</th>":"")+"<th>عدد رصيد</th><th>ملاحظات</th>";
+  if(sm)h="<th class=nn>بند</th><th>الصنف</th>"+(P?"<th>النوع</th>":"")+"<th>العدد</th>"+(wt?"<th>الوزن</th>":"")+"<th>تفاصيل / ملاحظات</th>";
+  else h="<th class=nn>بند</th><th>الصنف</th>"+(P?"<th>النوع</th>":"")+""+(wt?"<th>وزن أول</th>":"")+"<th>عدد أول</th>"+(wt?"<th>وزن إضافات</th>":"")+"<th>عدد إضافات</th>"+(wt?"<th>وزن صرف</th>":"")+"<th>عدد صرف</th>"+(wt?"<th>وزن رصيد</th>":"")+"<th>عدد رصيد</th><th>ملاحظات</th>";
   rows.forEach(o=>{const cl=o.bn<0?" neg":(!o.bn&&!o.bw)?" zr":"",det=o.cust?"📌 "+o.cust:(P?o.note:["الكبير","الشامى","الجديد"].map((k,j)=>o.ex[j]?k+" "+fm(o.ex[j]):"").filter(Boolean).join(" · ")+(o.note?" — "+o.note:""));
-   b+="<tr class='"+cl+"'><td class=nn>"+(o.no||"—")+"</td><td class='l nmc'>"+E(o.n.trim())+"</td><td>"+E(o.extra?"مش في الشيت":o.store)+"</td>"+(sm?"<td class='b bl'>"+N(o.bn)+"</td>"+(wt?"<td class='b'>"+N(nwv(o,o.bw))+"</td>":"")+"<td class='l'>"+E(det)+"</td>"
+   b+="<tr class='"+cl+"'><td class=nn>"+(o.no||"—")+"</td><td class='l nmc'>"+E(o.n.trim())+"</td>"+(P?"<td>"+E(o.extra?"مش في الشيت":o.store)+"</td>":"")+(sm?"<td class='b bl'>"+N(o.bn)+"</td>"+(wt?"<td class='b'>"+N(nwv(o,o.bw))+"</td>":"")+"<td class='l'>"+E(det)+"</td>"
     :(wt?"<td>"+N(nwv(o,o.ow))+"</td>":"")+"<td>"+N(o.on)+"</td>"+(wt?"<td>"+N(nwv(o,o.iw))+"</td>":"")+"<td>"+N(o.inn)+"</td>"+(wt?"<td>"+N(nwv(o,o.xw))+"</td>":"")+"<td>"+N(o.xn)+"</td>"+(wt?"<td class='b'>"+N(nwv(o,o.bw))+"</td>":"")+"<td class='b bl'>"+N(o.bn)+"</td><td class='l'>"+E(det)+"</td>")+"</tr>"})}
  else{h="<th>التاريخ</th><th>رقم الأذن</th><th>امر الشغل</th><th>الصنف</th>"+(wt?"<th>وزن</th>":"")+"<th>عدد</th><th>"+(TAB==="in"?"وارد من":"منصرف الى")+"</th><th>ملاحظات</th>";
   rows.forEach(m=>{b+="<tr><td>"+E(m.d)+"</td><td>"+E(m.doc)+"</td><td>"+E(m.wo)+"</td><td class='l nmc'>"+E(m.name.trim())+"</td>"+(wt?"<td>"+N(m.w)+"</td>":"")+"<td class='b bl'>"+N(m.c)+"</td><td class='l'>"+E(m.p)+"</td><td class='l'>"+E([m.h,m.note].filter(Boolean).join(" - "))+"</td></tr>"})}
